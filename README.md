@@ -1,28 +1,10 @@
-# awesome-bitquery-polymarket-v2
+# Awesome Polymarket Data API
 
 Resources for working with **Polymarket** prediction-market data through **Bitquery's V2 GraphQL API**, WebSocket subscriptions, and Kafka.
 
-I was building a small Polymarket odds dashboard and went pretty deep on Bitquery's `PredictionTrades` / `PredictionManagements` / `PredictionSettlements` cubes. Putting the queries that actually worked here so others don't have to dig through five doc pages to piece them together.
+I was building a small Polymarket odds dashboard and went pretty deep on Bitquery's GraphQL APIs. Putting the queries that actually worked here so others don't have to dig through five doc pages to piece them together.
 
-> One thing that bit me: Polymarket data lives on the `realtime` dataset on Polygon, which only retains roughly the **last 7 days**. If you want longer history for backtesting, you have to ask sales — it's not in the default plan.
-
----
-
-## Contents
-
-- [Background (CTF / Polygon)](#background-ctf--polygon)
-- [Endpoint & auth](#endpoint--auth)
-- [Cubes](#cubes)
-- [Trades & prices](#trades--prices)
-- [Markets & lifecycle](#markets--lifecycle)
-- [Settlements & positions](#settlements--positions)
-- [Wallet activity](#wallet-activity)
-- [Top markets by volume](#top-markets-by-volume)
-- [Themed markets](#themed-markets)
-- [CTF Exchange (raw events)](#ctf-exchange-raw-events)
-- [Streaming](#streaming)
-- [SDKs / tools](#sdks--tools)
-- [Links](#links)
+> One thing that bit me: Polymarket data lives on the `realtime` dataset on Polygon, which only retains roughly the **last 7 days**.
 
 ---
 
@@ -41,15 +23,13 @@ Quick refresher in case it's useful:
 
 V2 endpoint: `https://streaming.bitquery.io/graphql`
 
-Generate a token at [account.bitquery.io/user/api_v2/access_tokens](https://account.bitquery.io/user/api_v2/access_tokens?utm_source=github&utm_medium=readme&utm_campaign=awesomelist), pass as `Authorization: Bearer <token>`. Same token works for HTTP and WebSocket. Kafka is separate — contact support if you need it.
+Generate a token at [account.bitquery.io/user/api_v2/access_tokens](https://account.bitquery.io/user/api_v2/access_tokens?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket), pass as `Authorization: Bearer <token>`. Same token works for HTTP and WebSocket. Kafka is separate — contact support if you need it.
 
 ```bash
-curl -X POST https://streaming.bitquery.io/graphql \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d @- <<'EOF'
-{"query":"query { EVM(network: matic) { PredictionTrades(limit: {count: 5}, orderBy: {descending: Transaction_Time}, where: {Trade: {Prediction: {Marketplace: {ProtocolName: {is: \"polymarket\"}}}}}) { Transaction { Hash Time } Trade { Prediction { Question { Title } Outcome { Label } } OutcomeTrade { Buyer Seller Amount CollateralAmount } } } } }"}
-EOF
+curl --location 'https://streaming.bitquery.io/graphql' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <Your Access Token>' \
+--data '{"query":"query questionByLiquidity($time_ago: Int!, $limit: Int!) {\n  EVM(network: matic) {\n    PredictionSettlements(\n      where: {\n        Block: {Time: {since_relative: {hours_ago: $time_ago}}}\n        Settlement: {Prediction: {Question: {ResolutionSource: {includes: \"espncricinfo.com\"}}}}\n      }\n      limit: {count: $limit}\n      orderBy: {descendingByField: \"position\"}\n      limitBy: {by: Settlement_Prediction_Question_Id}\n    ) {\n      Settlement {\n        Prediction { Question { Image MarketId Title Id CreatedAt ResolutionSource } }\n      }\n      split: sum(of: Settlement_Amounts_CollateralAmountInUSD if: {Settlement: {EventType: {is: \"Split\"}}})\n      merge: sum(of: Settlement_Amounts_CollateralAmountInUSD if: {Settlement: {EventType: {is: \"Merge\"}}})\n      position: calculate(expression: \"$split - $merge\")\n    }\n  }\n}","variables":"{\n  \"time_ago\": 24,\n  \"limit\": 100\n}"}'
 ```
 
 ---
@@ -70,27 +50,27 @@ Three cubes do most of the work, all under `EVM(network: matic, dataset: realtim
 
 ## Trades & prices
 
-### [Latest Polymarket Trades](https://ide.bitquery.io/latest-polymarket-trades)
+### [Latest Polymarket Trades](https://ide.bitquery.io/latest-polymarket-trades/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
 This resource provides us with the latest trades that occured on Polymarket, which can be useful for trading algorithms and portfolio managers.
 
-### [Latest Odds for Every Active Polymarket](https://ide.bitquery.io/Latest-odds-for-every-polymarket)
+### [Latest Odds for Every Active Polymarket](https://ide.bitquery.io/Latest-odds-for-every-polymarket/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
 This resource provides the latest odds for each Polymarket, which enables technical traders with accurate real time price info.
 
-### [Whale Trade Stream](https://ide.bitquery.io/whale-trade-stream)
+### [Whale Trade Stream](https://ide.bitquery.io/whale-trade-stream/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
 This resource tracks trades larger than $10k USD, which is essentially a threshold assumed for whale wallet transactions.
 
-### [Largest Trades in Last 7 Days](https://ide.bitquery.io/Top-100-trades-in-the-past-7-days)
+### [Largest Trades in Last 7 Days](https://ide.bitquery.io/Top-100-trades-in-the-past-7-days/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
 This resource provides the top 100 largest trades on Polymarket for the interval of past 7 days. This could be of great use for market analysis.
 
-### [Top Buyers and Sellers by Volume for Last 5 Days](https://ide.bitquery.io/Top-buyers-and-sellers-on-polymarket)
+### [Top Buyers and Sellers by Volume for Last 5 Days](https://ide.bitquery.io/Top-buyers-and-sellers-on-polymarket/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
 This resource provides the top buyers and sellers for Polymarket over the past 5 days period, which could prove to be a great metric when running market analysis.
 
-### [Trade count for a wallet](https://ide.bitquery.io/trade-counts-for-a-wallet-on-polymarket)
+### [Trade count for a wallet](https://ide.bitquery.io/trade-counts-for-a-wallet-on-polymarket/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
 This resource provides the tally for Polymarket trades by a wallet, which is a great metric to have for portfolio managers and auditors.
 
@@ -98,127 +78,32 @@ This resource provides the tally for Polymarket trades by a wallet, which is a g
 
 ## Markets & lifecycle
 
-### All market events (Created / Resolved)
+### [All Market Creation and Resolution Events](https://ide.bitquery.io/Latest-market-creation-and-resolution-events/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
-```graphql
+THis resource provides the latest market creation and resolution events, which can prove to be very useful for algo trading applications like sniper trading, and for portfolio tracking applications as well.
 
-```
 
-`Question.MarketId` matches `https://gamma-api.polymarket.com/markets/{MarketId}` so you can join with Polymarket's own metadata API for stuff Bitquery doesn't index (descriptions, tags, etc.).
+### Filter markets by Question Title](https://ide.bitquery.io/markets-by-question-title/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
-### Filter markets by Asset ID, Condition ID, or slug/keyword
-
-```graphql
-query MarketsByAssetId($assetIds: [String!]) {
-  EVM(network: matic) {
-    PredictionManagements(
-      where: {
-        Management: {
-          Prediction: {
-            Marketplace: {ProtocolName: {is: "polymarket"}}
-            OutcomeToken: {AssetId: {in: $assetIds}}
-          }
-        }
-      }
-    ) {
-      Management {
-        Prediction {
-          Question { MarketId Title }
-          Condition { Id }
-          OutcomeToken { AssetId SmartContract }
-        }
-      }
-    }
-  }
-}
-```
-
-Swap the inner filter for `Condition: {Id: {in: $conditionIds}}` or `Question: {Title: {includesCaseInsensitive: $keyword}}` to filter by condition or slug instead.
+This resource allows us to get Polymarkets which includes a specific Question, for example - "Bitcoin Up or Down". This could be very useful for people targeting a very specific kind of Polymarket.
 
 ---
 
-## Settlements & positions
+## Settlements and Positions for a Wallet](https://ide.bitquery.io/settlements-and-resolutions-for-a-wallet/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
-```graphql
-query {
-  EVM(network: matic) {
-    PredictionSettlements(
-      where: {Settlement: {Prediction: {Marketplace: {ProtocolName: {is: "polymarket"}}}}}
-      limit: {count: 50}
-      orderBy: {descending: Block_Time}
-    ) {
-      Settlement {
-        EventType  # "Split" | "Merge" | "Redemption"
-        Amounts { CollateralAmount CollateralAmountInUSD }
-        Prediction { Question { MarketId Title } }
-      }
-      Transaction { Hash From }
-    }
-  }
-}
-```
+This event returns the latest settlements and positions for a wallet on Polymarket, making it very useful for portfolio managing applications.
 
 ---
 
-## Wallet activity
+## [Wallet Stats](https://ide.bitquery.io/trader-stats-for-past-5-hours/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
-Aggregate stats for a single wallet over the last 5 hours.
-
-```graphql
-query MyQuery($trader: String) {
-  EVM(network: matic) {
-    PredictionTrades(
-      where: {
-        TransactionStatus: { Success: true }
-        any: [
-          { Trade: { OutcomeTrade: { Buyer: { is: $trader } } } }
-          { Trade: { OutcomeTrade: { Seller: { is: $trader } } } }
-        ]
-        Block: { Time: { since_relative: { hours_ago: 5 } } }
-      }
-    ) {
-      Total_Outcomes_traded: count
-      Total_Outcome_Amount: sum(of: Trade_OutcomeTrade_Amount)
-      Total_Collateral_Amount: sum(of: Trade_OutcomeTrade_CollateralAmount)
-      Total_Markets: count(distinct: Trade_Prediction_Question_MarketId)
-    }
-  }
-}
-```
+Aggregate stats for a single wallet over the last 5 hours to determine wallet performance.
 
 ---
 
-## Top markets by volume
+## [Top markets by volume](https://ide.bitquery.io/top-markets-by-volume-for-past-24-hours/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
-```graphql
-query questionsByVolume($time_ago: DateTime) {
-  EVM(network: matic) {
-    PredictionTrades(
-      where: {
-        TransactionStatus: {Success: true}
-        Block: {Time: {since: $time_ago}}
-        Trade: {Prediction: {Marketplace: {ProtocolName: {is: "polymarket"}}}}
-      }
-      limit: {count: 100}
-      orderBy: {descendingByField: "sumBuyAndSell"}
-      limitBy: {by: Trade_Prediction_Question_Id}
-    ) {
-      Trade { Prediction { Question { Id Image Title CreatedAt } } }
-      buyUSD: sum(
-        of: Trade_OutcomeTrade_CollateralAmountInUSD
-        if: {Trade: {OutcomeTrade: {IsOutcomeBuy: true}}}
-      )
-      sellUSD: sum(
-        of: Trade_OutcomeTrade_CollateralAmountInUSD
-        if: {Trade: {OutcomeTrade: {IsOutcomeBuy: false}}}
-      )
-      sumBuyAndSell: calculate(expression: "$buyUSD + $sellUSD")
-    }
-  }
-}
-```
-
-The `calculate(expression: ...)` field is handy — saves doing the addition client-side.
+This resource helps us by sorting out the top markets based on trading volume so that users could target their funds in active markets.
 
 ---
 
@@ -226,62 +111,13 @@ The `calculate(expression: ...)` field is handy — saves doing the addition cli
 
 Polymarket has clusters of similar markets you can filter for. Pattern is mostly `Question.Title` substring or `ResolutionSource` host.
 
-### Bitcoin Up or Down
+### [Bitcoin Up or Down](](https://ide.bitquery.io/markets-by-question-title/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
-```graphql
-subscription {
-  EVM(network: matic) {
-    PredictionTrades(
-      where: {
-        Trade: {
-          Prediction: {
-            Marketplace: {ProtocolName: {is: "polymarket"}}
-            Question: {Title: {includes: "Bitcoin Up or Down"}}
-          }
-        }
-      }
-    ) {
-      Block { Time }
-      Trade {
-        OutcomeTrade { Buyer Seller CollateralAmountInUSD Price IsOutcomeBuy }
-        Prediction { Question { Title MarketId } Outcome { Label } }
-      }
-      Transaction { Hash }
-    }
-  }
-}
-```
-
-### Sports / cricket / esports
-
-Cricket markets resolve via espncricinfo.com, so filter on `ResolutionSource`:
-
-```graphql
-query questionByLiquidity($time_ago: Int!, $limit: Int!) {
-  EVM(network: matic) {
-    PredictionSettlements(
-      where: {
-        Block: {Time: {since_relative: {hours_ago: $time_ago}}}
-        Settlement: {Prediction: {Question: {ResolutionSource: {includes: "espncricinfo.com"}}}}
-      }
-      limit: {count: $limit}
-      orderBy: {descendingByField: "position"}
-      limitBy: {by: Settlement_Prediction_Question_Id}
-    ) {
-      Settlement {
-        Prediction { Question { Image MarketId Title Id CreatedAt ResolutionSource } }
-      }
-      split: sum(of: Settlement_Amounts_CollateralAmountInUSD if: {Settlement: {EventType: {is: "Split"}}})
-      merge: sum(of: Settlement_Amounts_CollateralAmountInUSD if: {Settlement: {EventType: {is: "Merge"}}})
-      position: calculate(expression: "$split - $merge")
-    }
-  }
-}
-```
+### [Sports / Cricket/ Football/ Esports](https://ide.bitquery.io/top-cricket-markets-by-liquidity_1/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 
 ### Commodities (Gold / Oil)
 
-Same pattern, different `Question.Title` or `ResolutionSource` filter. See [docs.bitquery.io/docs/examples/polymarket-api/polymarket-commodity-api](https://docs.bitquery.io/docs/examples/polymarket-api/polymarket-commodity-api/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist).
+Same pattern, different `Question.Title` or `ResolutionSource` filter. See [docs.bitquery.io/docs/examples/polymarket-api/polymarket-commodity-api](https://docs.bitquery.io/docs/examples/polymarket-api/polymarket-commodity-api/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket).
 
 ---
 
@@ -315,15 +151,14 @@ Reference: [docs.bitquery.io/docs/examples/polymarket-api/polymarket-ctf-exchang
   import { getAllTrades, streamAllTrades } from 'polymarket-api';
   const trades = await getAllTrades(token, 50);
   ```
-- [Bitquery IDE](https://ide.bitquery.io/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist) — Run/share queries.
-- [Polymarket Gamma API](https://gamma-api.polymarket.com/markets) — Polymarket's own metadata API. Good to pair with Bitquery (Bitquery has on-chain data; Gamma has descriptions, tags, slugs).
+- [Bitquery IDE](https://ide.bitquery.io/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket) — Run/share queries.
 
 ---
 
 ## Links
 
-- Polymarket cookbook: [docs.bitquery.io/docs/category/polymarket-api](https://docs.bitquery.io/docs/category/polymarket-api/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist)
-- Prediction markets index: [docs.bitquery.io/docs/category/prediction-markets](https://docs.bitquery.io/docs/category/prediction-markets/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist)
+- Polymarket cookbook: [docs.bitquery.io/docs/category/polymarket-api](https://docs.bitquery.io/docs/category/polymarket-api/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
+- Prediction markets index: [docs.bitquery.io/docs/category/prediction-markets](https://docs.bitquery.io/docs/category/prediction-markets/?utm_source=github&utm_medium=readme&utm_campaign=awesomelist_polymarket)
 - Telegram: [t.me/bloxy_info](https://t.me/bloxy_info)
 - GitHub: [github.com/bitquery](https://github.com/bitquery)
 
